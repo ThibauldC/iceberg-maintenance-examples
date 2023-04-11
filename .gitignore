@@ -1,0 +1,7 @@
+.bsp
+.DS_Store
+.idea
+target/
+project/
+src/main/resources/data
+src/main/resources/warehouse
