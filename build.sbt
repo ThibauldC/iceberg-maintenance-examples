@@ -6,13 +6,19 @@ lazy val root = (project in file("."))
   .settings(
     name := "iceberg-maintenance-examples",
     idePackagePrefix := Some("com.tcroonen"),
-    libraryDependencies += "org.apache.spark" %% "spark-core" % "3.3.2",
-    libraryDependencies += "org.apache.iceberg" % "iceberg-core" % "1.2.0",
-    libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.3.2",
-    libraryDependencies += "org.apache.hive" % "hive-metastore" % "3.0.0",
-    libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "3.3.4",
-    libraryDependencies += "org.apache.parquet" % "parquet-hadoop-bundle" % "1.12.2",
-    libraryDependencies += "org.apache.iceberg" %% "iceberg-spark-runtime-3.3" % "1.2.0",
-    libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2"
-
+    libraryDependencies ++= Seq(
+        "org.apache.iceberg" % "iceberg-core" % "1.2.0",
+        "org.apache.spark" %% "spark-sql" % "3.3.2",
+        "org.apache.hive" % "hive-metastore" % "3.0.0",
+        "org.apache.hadoop" % "hadoop-common" % "3.3.4",
+        "org.apache.parquet" % "parquet-hadoop-bundle" % "1.12.2",
+        "org.apache.iceberg" %% "iceberg-spark-runtime-3.3" % "1.2.0",
+        "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2"
+    ),
+    excludeDependencies ++= Seq (
+      ExclusionRule("org.slf4j", "slf4j-log4j12"),
+      ExclusionRule("log4j", "log4j"),
+      ExclusionRule("org.slf4j", "slf4j-reload4j"),
+      ExclusionRule("ch.qos.logback", "logback-classic"),
+    )
   )
