@@ -18,6 +18,12 @@ done
 
 ## Maintenance
 ### Why maintenance?
+Over time data will accumulate in your Iceberg table and the amount of data and metadata files will grow significantly.
+Performing maintenance on your Iceberg tables can have major benefits, the biggest being query performance and reduced storage costs.
+
+Maintenance can optimize query performance in Iceberg tables by reducing metadata fragmentation and improving data organization.
+As data is added or deleted from an Apache Iceberg table, the table's metadata can become fragmented, which can impact query performance,
+as queries may need to open more files and scan more data than necessary.
 
 ### Expiring snapshots
 #### Cause
@@ -26,6 +32,21 @@ done
 #### Code
 
 ### Rewriting data files
+
+#### Potential problem
+Data may arrive in smaller batches in Iceberg tables, due to small writes or due to the ingestion of streaming data.
+An issue that arises when ingesting smaller files is that they are faster to write  but not as fast to query. 
+When it comes to querying the data it would be more efficient to have fewer larger files with more data.
+
+#### Benefit
+
+Analyzing a query involves using each file’s metadata to calculate how many splits are required and
+where to schedule each task to maximize data localization. The more files, the longer this part of query planning will take. 
+Large files, on the other hand, can also cause significantly decreased performance by limiting parallelism.
+
+#### Code
+
+
 ### Deleting orphan files
 #### Cause
 Sometimes Spark can create partially written files, or files not associated with any snapshots. These files do not have a
