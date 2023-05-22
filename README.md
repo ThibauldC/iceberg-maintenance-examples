@@ -1,4 +1,4 @@
-# Performing table maintenance on Apache Iceberg tables using Apache Spark (with Scala and Python) 
+# Performing table maintenance on unpartitioned Apache Iceberg tables using Apache Spark (with Scala and Python) 
 ## Preface
 For this walkthrough we will use [open taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) 
 from New York.
@@ -17,19 +17,14 @@ done
 ```
 
 ## Maintenance
-### Why maintenance?
+### Why perform maintenance on Iceberg tables?
 Over time data will accumulate in your Iceberg table and the amount of data and metadata files will grow significantly.
-Performing maintenance on your Iceberg tables can have major benefits, the biggest being query performance and reduced storage costs.
+Performing maintenance on your Iceberg tables can have major benefits, such as query performance, reduced storage costs 
+and retaining data integrity. 
 
-Maintenance can optimize query performance in Iceberg tables by reducing metadata fragmentation and improving data organization.
-As data is added or deleted from an Apache Iceberg table, the table's metadata can become fragmented, which can impact query performance,
-as queries may need to open more files and scan more data than necessary.
-
-### Expiring snapshots
-#### Cause
-
-#### Benefit
-#### Code
+The key to keeping your tables healthy and performant is by making sure your metadata and data files do not grow too 
+large in number. As data is added or deleted from an Apache Iceberg table, the table's metadata can become fragmented, which can impact query performance,
+as queries may need to open more files and scan more data than necessary. Iceberg provides a number of actions dealing with maintenance out of the box.
 
 ### Rewriting data files
 
@@ -45,7 +40,82 @@ where to schedule each task to maximize data localization. The more files, the l
 Large files, on the other hand, can also cause significantly decreased performance by limiting parallelism.
 
 #### Code
+To simulate a number of small files arriving into our Iceberg warehouse we will set a table property called 
+`write.target-file-size-bytes` to 10Mb. As you can see when adding a few snapshots:
 
+![Small files in the Iceberg data files](images/small_files.png)
+
+You can choose between 2 strategies when rewriting data files: *binpack* and *sort*.
+The *sort* strategy allows for sorting the data using the table sort order or a custom one,
+and potentially using *z-order*. We will not go further into this right here.
+
+A common option to provide is the target file size, which is the output size that Iceberg will try
+to reach when rewriting files. We will use 100Mb here as an example.
+
+```scala
+SparkActions.get(spark)
+  .rewriteDataFiles(table)
+  .option("target-file-size-bytes", (1024 * 1024 * 100L).toString)
+  .binPack
+  .execute
+```
+
+If you look at the summary of the latest snapshot, you see that 33 data files have been rewritten (**replace** operation) to 4 data files:
+
+```json
+{
+  "operation" : "replace",
+  "added-data-files" : "4",
+  "deleted-data-files" : "33",
+  "added-records" : "19817583",
+  "deleted-records" : "19817583",
+  "added-files-size" : "312579175",
+  "removed-files-size" : "320381884",
+  "changed-partition-count" : "1",
+  "total-records" : "19817583",
+  "total-files-size" : "312579175",
+  "total-data-files" : "4",
+  "total-delete-files" : "0",
+  "total-position-deletes" : "0",
+  "total-equality-deletes" : "0"
+}
+```
+
+When looking in the data files directory:
+
+![Rewritten data files](images/last_modified.png)
+
+Achieving the same result in Python with a Spark procedure:
+```python
+print("to be filled in")
+```
+
+### Expiring snapshots
+As said in the intro data and especially snapshots can accumulate over time .Although Iceberg re-uses unchanged data files
+from previous snapshots, sometimes new snapshots require changing or removing data files. These files are only kept for time travel
+or rollbacks, but it is recommended to set some sort of data retention period by regularly expiring snapshots.
+
+Expiring snapshots on your Iceberg tables will have cost benefits as data that is not needed anymore will automatically
+be deleted from your storage (which can be significant if you have to maintain a lot of tables). It will also improve
+performance, as fewer data needs to be scanned.
+
+#### Code
+
+This action explicitly expires snapshots, but metadata files are still kept for history. You can also automatically clean
+metadata files by setting the following table properties:
+
+- `write.metadata.delete-after-commit.enabled` to `true`
+- `write.metadata.previous-versions-max` to the number of metadata files you want to keep
+
+The data files associated with these deleted metadata files can be removed by the maintenance action that cleans up
+orphaned data files (see below).
+
+TODO: check manually the following:
+Note that this will only delete metadata files that are tracked in the metadata log and will not delete orphaned metadata files.
+Example: With write.metadata.delete-after-commit.enabled=false and write.metadata.previous-versions-max=10, one will have
+10 tracked metadata files and 90 orphaned metadata files after 100 commits. Configuring write.metadata.delete-after-commit.enabled=true
+and write.metadata.previous-versions-max=20 will not automatically delete metadata files.
+Tracked metadata files would be deleted again when reaching write.metadata.previous-versions-max=20.
 
 ### Deleting orphan files
 #### Cause
@@ -54,7 +124,7 @@ reference in the table metadata and are therefore not being picked up through ot
 
 #### Benefit
 Running this procedure regularly prevents unused files from accumulating on your storage, thus keeping your folders 
-clean and preventing additional storage costs
+clean and preventing additional storage costs.
 
 #### Code
 For demonstrating this procedure we will create an orphan file ourselves (since it will not be referenced by any of the 
@@ -73,6 +143,7 @@ SparkActions.get(spark)
   .olderThan(System.currentTimeMillis() - 1000L*60*60*24*7)
   .execute
 ```
+ **Add json object!!!!!**
 
 Only the `partial-file` has been removed and all other files are left untouched.
 Even if you run this with the `olderThan` setting all data files are maintained and only the created orphan file

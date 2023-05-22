@@ -1,5 +1,6 @@
 package com.tcroonen
 
+import org.apache.iceberg.SortOrder
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import org.apache.iceberg.spark.Spark3Util
@@ -25,28 +26,36 @@ object Main {
       .master("local[*]")
       .getOrCreate
 
-    val taxis = spark.read.parquet("src/main/resources/data/yellow_tripdata_2022-01.parquet")
-    taxis.show(20)
-
-//    taxis.write.format("iceberg").saveAsTable("local.nyc.taxis")
+//    val taxis = spark.read.parquet("src/main/resources/data/yellow_tripdata_2022-01.parquet")
+//    taxis.show(20)
 //
-    (1 to 3)
-      .foreach { i =>
-        val t = spark.read.parquet(s"src/main/resources/data/yellow_tripdata_2022-0$i.parquet")
-        t.write.format("iceberg").mode("append").save("local.nyc.taxis")
-      }
+//    taxis.writeTo("local.nyc.taxis")
+//      .tableProperty("write.target-file-size-bytes", "10485760")
+//      .createOrReplace()
+//
+//    (2 to 6)
+//      .foreach { i =>
+//        val t = spark.read.parquet(s"src/main/resources/data/yellow_tripdata_2022-0$i.parquet")
+//        t.write.format("iceberg").mode("append").save("local.nyc.taxis")
+//      }
 
 
     //val maint = Maintenance
     //maint.deleteOrphanFiles(table)
 
 
-//    val table = Spark3Util.loadIcebergTable(spark, "local.nyc.taxis")
+    val table = Spark3Util.loadIcebergTable(spark, "local.nyc.taxis")
 //
 //    SparkActions.get(spark)
 //      .expireSnapshots(table)
 //      .retainLast(3)
-//      .expireFiles()
+//      .execute
+//
+    SparkActions.get(spark)
+      .rewriteDataFiles(table)
+      .option("target-file-size-bytes", (1024 * 1024 * 100L).toString)
+      .binPack
+      .execute
 
 //    SparkActions.get(spark)
 //      .deleteOrphanFiles(table)
