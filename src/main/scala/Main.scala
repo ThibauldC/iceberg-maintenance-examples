@@ -26,18 +26,20 @@ object Main {
       .master("local[*]")
       .getOrCreate
 
-//    val taxis = spark.read.parquet("src/main/resources/data/yellow_tripdata_2022-01.parquet")
-//    taxis.show(20)
-//
-//    taxis.writeTo("local.nyc.taxis")
-//      .tableProperty("write.target-file-size-bytes", "10485760")
-//      .createOrReplace()
-//
-//    (2 to 6)
-//      .foreach { i =>
-//        val t = spark.read.parquet(s"src/main/resources/data/yellow_tripdata_2022-0$i.parquet")
-//        t.write.format("iceberg").mode("append").save("local.nyc.taxis")
-//      }
+    val taxis = spark.read.parquet("src/main/resources/data/yellow_tripdata_2022-01.parquet")
+    taxis.show(20)
+
+    taxis.writeTo("local.nyc.taxis2")
+      .tableProperty("write.target-file-size-bytes", "10485760")
+      .tableProperty("write.metadata.delete-after-commit.enabled", "true")
+      .tableProperty("write.metadata.previous-versions-max", "3")
+      .createOrReplace()
+
+    (2 to 6)
+      .foreach { i =>
+        val t = spark.read.parquet(s"src/main/resources/data/yellow_tripdata_2022-0$i.parquet")
+        t.write.format("iceberg").mode("append").save("local.nyc.taxis2")
+      }
 
 
     //val maint = Maintenance
@@ -45,21 +47,26 @@ object Main {
 
 
     val table = Spark3Util.loadIcebergTable(spark, "local.nyc.taxis")
-//
+
 //    SparkActions.get(spark)
 //      .expireSnapshots(table)
-//      .retainLast(3)
+//      .expireOlderThan(System.currentTimeMillis())
+//      .retainLast(1)
 //      .execute
-//
-    SparkActions.get(spark)
-      .rewriteDataFiles(table)
-      .option("target-file-size-bytes", (1024 * 1024 * 100L).toString)
-      .binPack
-      .execute
+
+//    SparkActions.get(spark)
+//      .rewriteDataFiles(table)
+//      .option("target-file-size-bytes", (1024 * 1024 * 100L).toString)
+//      .binPack
+//      .execute
 
 //    SparkActions.get(spark)
 //      .deleteOrphanFiles(table)
 //      .olderThan(System.currentTimeMillis() - 1000L*60*60*24*7)
+//      .execute
+//
+//    SparkActions.get(spark)
+//      .rewriteManifests(table)
 //      .execute
   }
 }

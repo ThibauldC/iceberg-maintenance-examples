@@ -81,7 +81,7 @@ If you look at the summary of the latest snapshot, you see that 33 data files ha
 }
 ```
 
-When looking in the data files directory:
+When looking in the data files directory (only 3 files of +- 100Mb are displayed, there is still 1 file of 5Mb):
 
 ![Rewritten data files](images/last_modified.png)
 
@@ -91,15 +91,31 @@ print("to be filled in")
 ```
 
 ### Expiring snapshots
-As said in the intro data and especially snapshots can accumulate over time .Although Iceberg re-uses unchanged data files
+#### Potential problem
+As mentioned above data and especially snapshots can accumulate over time .Although Iceberg re-uses unchanged data files
 from previous snapshots, sometimes new snapshots require changing or removing data files. These files are only kept for time travel
 or rollbacks, but it is recommended to set some sort of data retention period by regularly expiring snapshots.
 
+#### Benefit
 Expiring snapshots on your Iceberg tables will have cost benefits as data that is not needed anymore will automatically
 be deleted from your storage (which can be significant if you have to maintain a lot of tables). It will also improve
 performance, as fewer data needs to be scanned.
 
 #### Code
+
+```scala
+SparkActions.get(spark)
+  .expireSnapshots(table)
+  .expireOlderThan(System.currentTimeMillis())
+  .retainLast(1)
+  .execute
+```
+
+If you look in your metadata file only metadata about the last snapshot should be available. Ideally you would want to 
+keep more than 1 snapshot and snapshots older than the current time, but this is used to demonstrate the expiration and 
+the fact that only the rewritten files are kept. You can see that the data files related to the expired snapshots have been deleted:
+
+![Expired snapshots](images/expired_snapshots.png)
 
 This action explicitly expires snapshots, but metadata files are still kept for history. You can also automatically clean
 metadata files by setting the following table properties:
@@ -118,7 +134,7 @@ and write.metadata.previous-versions-max=20 will not automatically delete metada
 Tracked metadata files would be deleted again when reaching write.metadata.previous-versions-max=20.
 
 ### Deleting orphan files
-#### Cause
+#### Potential problem
 Sometimes Spark can create partially written files, or files not associated with any snapshots. These files do not have a
 reference in the table metadata and are therefore not being picked up through other cleanup actions.
 
@@ -136,6 +152,11 @@ touch -d $TS src/main/resources/warehouse/nyc/taxis/data/partial-file
 ```
 **!** This date command is for OS X, but will be different on other systems.
 
+You can see the file has been added:
+
+![Partial file](images/with_partial.png)
+
+
 We will then remove all orphan files which are older than 7 days (default = 3 days).
 ```scala
 SparkActions.get(spark)
@@ -143,13 +164,21 @@ SparkActions.get(spark)
   .olderThan(System.currentTimeMillis() - 1000L*60*60*24*7)
   .execute
 ```
- **Add json object!!!!!**
 
-Only the `partial-file` has been removed and all other files are left untouched.
+Only the `partial-file` has been removed and all other files are left untouched:
+
+![Partial removed](images/partial_removed.png)
+
 Even if you run this with the `olderThan` setting all data files are maintained and only the created orphan file
 has been removed.
 
-spark 3.3.0 and up with Java 17 (add to VM options in Run/Debug configurations)
+### Rewriting manifest files
+Personally I don't have a lot of experience with this, but I will mention it for completeness. For better scan planning 
+it would be beneficial to rewrite the manifest files to obtain optimal sizes.
+
+## Might be helpful
+
+If you are running Spark 3.3.0 and up with Java 17, add the following JVM options:
 ```
 --add-opens=java.base/java.lang=ALL-UNNAMED \
 --add-opens=java.base/java.lang.invoke=ALL-UNNAMED \
