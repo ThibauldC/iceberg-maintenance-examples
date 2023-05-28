@@ -1,9 +1,7 @@
 # Performing table maintenance on unpartitioned Apache Iceberg tables using Apache Spark (with Scala and Python) 
 ## Preface
-For this walkthrough we will use [open taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) 
-from New York.
-
-It can be downloaded using this script (for downloading months 1-6 from 2022 at once):
+In this walkthrough we will use [open taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) 
+from New York.You can download the data using the following script, which downloads months 1-6 from 2022 at once:
 
 ```
 #!/bin/bash
@@ -18,41 +16,42 @@ done
 
 ## Maintenance
 ### Why perform maintenance on Iceberg tables?
-Over time data will accumulate in your Iceberg table and the amount of data and metadata files will grow significantly.
-Performing maintenance on your Iceberg tables can have major benefits, such as query performance, reduced storage costs 
-and retaining data integrity. 
+Over time, data will accumulate in your Iceberg table, and the number of data and metadata files will grow significantly. 
+Performing maintenance on your Iceberg tables can provide major benefits, such as improved query performance, 
+reduced storage costs, and data integrity.
 
-The key to keeping your tables healthy and performant is by making sure your metadata and data files do not grow too 
-large in number. As data is added or deleted from an Apache Iceberg table, the table's metadata can become fragmented, which can impact query performance,
-as queries may need to open more files and scan more data than necessary. Iceberg provides a number of actions dealing with maintenance out of the box.
+To keep your tables healthy and performant, it is essential to ensure that your metadata and data files do not grow 
+too large in number. As data is added or deleted from an Apache Iceberg table, the table's metadata can become fragmented, 
+impacting query performance as queries may need to open more files and scan more data than necessary. 
+Iceberg provides several built-in actions for dealing with maintenance.
 
 ### Rewriting data files
-
-#### Potential problem
-Data may arrive in smaller batches in Iceberg tables, due to small writes or due to the ingestion of streaming data.
-An issue that arises when ingesting smaller files is that they are faster to write  but not as fast to query. 
-When it comes to querying the data it would be more efficient to have fewer larger files with more data.
+#### Potential issue
+Data may arrive in smaller batches in Iceberg tables due to small writes or the ingestion of streaming data. 
+Ingesting smaller files is faster for writing but not as fast for querying. Querying the data would be more efficient 
+if there were fewer larger files with more data.
 
 #### Benefit
-
-Analyzing a query involves using each file’s metadata to calculate how many splits are required and
-where to schedule each task to maximize data localization. The more files, the longer this part of query planning will take. 
-Large files, on the other hand, can also cause significantly decreased performance by limiting parallelism.
+Analyzing a query involves using each file's metadata to calculate how many splits are required and where to schedule 
+each task to maximize data localization. The more files there are, the longer this part of query planning will take. 
+Large files can also significantly decrease performance by limiting parallelism.
 
 #### Code
-To simulate a number of small files arriving into our Iceberg warehouse we will set a table property called 
-`write.target-file-size-bytes` to 10Mb. As you can see when adding a few snapshots:
+To simulate the arrival of a number of small files into our Iceberg warehouse, we can set a table property called 
+`write.target-file-size-bytes` to 10Mb.Adding a few snapshots shows the presence of small files in the Iceberg data files:
 
 ![Small files in the Iceberg data files](images/small_files.png)
 
-You can choose between 2 strategies when rewriting data files: *binpack* and *sort*.
-The *sort* strategy allows for sorting the data using the table sort order or a custom one,
-and potentially using *z-order*. We will not go further into this right here.
+There are two strategies available for rewriting data files: *binpack* and *sort*.
+The *sort* strategy allows for sorting the data using the table sort order or a custom one, potentially using *z-order*.
+However, we won't delve into that here.
 
-A common option to provide is the target file size, which is the output size that Iceberg will try
-to reach when rewriting files. We will use 100Mb here as an example.
+A common option is to provide the target file size, which is the desired output size that Iceberg will attempt to reach 
+when rewriting files. Here's an example using a target file size of 100MB in Scala:
 
 ```scala
+val table = Spark3Util.loadIcebergTable(spark, "local.nyc.taxis")
+
 SparkActions.get(spark)
   .rewriteDataFiles(table)
   .option("target-file-size-bytes", (1024 * 1024 * 100L).toString)
@@ -60,7 +59,8 @@ SparkActions.get(spark)
   .execute
 ```
 
-If you look at the summary of the latest snapshot, you see that 33 data files have been rewritten (**replace** operation) to 4 data files:
+Upon examining the summary of the latest snapshot, you'll see that 33 data files have been rewritten using the 
+**replace** operation, resulting in 4 data files:
 
 ```json
 {
@@ -81,7 +81,8 @@ If you look at the summary of the latest snapshot, you see that 33 data files ha
 }
 ```
 
-When looking in the data files directory (only 3 files of +- 100Mb are displayed, there is still 1 file of 5Mb):
+Looking into the data files directory, you'll see the rewritten data files, with only 3 files of approximately 100MB 
+displayed, and one remaining file of 5MB:
 
 ![Rewritten data files](images/last_modified.png)
 
@@ -92,16 +93,18 @@ print("to be filled in")
 
 ### Expiring snapshots
 #### Potential problem
-As mentioned above data and especially snapshots can accumulate over time .Although Iceberg re-uses unchanged data files
-from previous snapshots, sometimes new snapshots require changing or removing data files. These files are only kept for time travel
-or rollbacks, but it is recommended to set some sort of data retention period by regularly expiring snapshots.
+As mentioned earlier, data and snapshots can accumulate over time. Although Iceberg reuses unchanged data files from 
+previous snapshots, new snapshots may require changing or removing data files. These files are typically kept for time 
+travel or rollbacks, but it is recommended to set a data retention period and regularly expire unnecessary snapshots.
 
 #### Benefit
-Expiring snapshots on your Iceberg tables will have cost benefits as data that is not needed anymore will automatically
-be deleted from your storage (which can be significant if you have to maintain a lot of tables). It will also improve
-performance, as fewer data needs to be scanned.
+Expiring snapshots on your Iceberg tables has cost benefits, as data that is no longer needed will automatically be 
+deleted from your storage. This can be significant if you have many tables to maintain. It also improves performance by 
+reducing the amount of data that needs to be scanned.
 
 #### Code
+
+To expire snapshots in your Iceberg table, you can use the following Scala code:
 
 ```scala
 SparkActions.get(spark)
@@ -111,53 +114,45 @@ SparkActions.get(spark)
   .execute
 ```
 
-If you look in your metadata file only metadata about the last snapshot should be available. Ideally you would want to 
-keep more than 1 snapshot and snapshots older than the current time, but this is used to demonstrate the expiration and 
-the fact that only the rewritten files are kept. You can see that the data files related to the expired snapshots have been deleted:
+This code expires snapshots older than the current time, retaining only the last snapshot. 
+Ideally, you would want to keep more than one snapshot and snapshots older than the current time. 
+However, this setup is used here to demonstrate the expiration and the fact that only the rewritten files are retained. 
+You can observe that the data files related to the expired snapshots have been deleted:
 
 ![Expired snapshots](images/expired_snapshots.png)
 
-This action explicitly expires snapshots, but metadata files are still kept for history. You can also automatically clean
-metadata files by setting the following table properties:
+While this action explicitly expires snapshots, the metadata files are still retained for historical purposes. 
+You can also automatically clean metadata files by setting the following table properties:
 
 - `write.metadata.delete-after-commit.enabled` to `true`
-- `write.metadata.previous-versions-max` to the number of metadata files you want to keep
-
-The data files associated with these deleted metadata files can be removed by the maintenance action that cleans up
-orphaned data files (see below).
-
-TODO: check manually the following:
-Note that this will only delete metadata files that are tracked in the metadata log and will not delete orphaned metadata files.
-Example: With write.metadata.delete-after-commit.enabled=false and write.metadata.previous-versions-max=10, one will have
-10 tracked metadata files and 90 orphaned metadata files after 100 commits. Configuring write.metadata.delete-after-commit.enabled=true
-and write.metadata.previous-versions-max=20 will not automatically delete metadata files.
-Tracked metadata files would be deleted again when reaching write.metadata.previous-versions-max=20.
+- `write.metadata.previous-versions-max` to the number of metadata files you want to keep (default 100)
 
 ### Deleting orphan files
 #### Potential problem
-Sometimes Spark can create partially written files, or files not associated with any snapshots. These files do not have a
-reference in the table metadata and are therefore not being picked up through other cleanup actions.
+Sometimes, Spark can create partially written files or files not associated with any snapshots. 
+These files do not have a reference in the table metadata and are therefore not picked up by other cleanup actions.
 
 #### Benefit
-Running this procedure regularly prevents unused files from accumulating on your storage, thus keeping your folders 
-clean and preventing additional storage costs.
+Regularly running this procedure prevents unused files from accumulating on your storage, 
+keeping your folders clean and avoiding additional storage costs.
 
 #### Code
-For demonstrating this procedure we will create an orphan file ourselves (since it will not be referenced by any of the 
-metadata files):
+To demonstrate the procedure of deleting orphan files, we will create an orphan file ourselves 
+(since it will not be referenced by any of the metadata files):
 
 ```
 TS=$(date -j -v-7d +"%Y-%m-%dT%H:%M:%S")
 touch -d $TS src/main/resources/warehouse/nyc/taxis/data/partial-file
 ```
-**!** This date command is for OS X, but will be different on other systems.
+**!** This date command is for macOS and may be different on other systems.
 
-You can see the file has been added:
+You can observe that the file has been added:
 
 ![Partial file](images/with_partial.png)
 
 
-We will then remove all orphan files which are older than 7 days (default = 3 days).
+Next, we will remove all orphan files that are older than 7 days (default is 3 days) using the following Scala code:
+
 ```scala
 SparkActions.get(spark)
   .deleteOrphanFiles(table)
@@ -165,16 +160,22 @@ SparkActions.get(spark)
   .execute
 ```
 
-Only the `partial-file` has been removed and all other files are left untouched:
+Only the `partial-file` has been removed, and all other files remain untouched:
 
 ![Partial removed](images/partial_removed.png)
 
-Even if you run this with the `olderThan` setting all data files are maintained and only the created orphan file
+Even if you run this with the `olderThan` setting all data files are maintained, and only the created orphan file
 has been removed.
 
 ### Rewriting manifest files
-Personally I don't have a lot of experience with this, but I will mention it for completeness. For better scan planning 
-it would be beneficial to rewrite the manifest files to obtain optimal sizes.
+Rewriting manifest files is beneficial for better scan planning and achieving optimal sizes. 
+However, I don't have much experience with this, so I will mention it for completeness.
+
+```scala
+SparkActions.get(spark)
+  .rewriteManifests(table)
+  .execute
+```
 
 ## Might be helpful
 
