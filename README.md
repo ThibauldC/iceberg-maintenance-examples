@@ -1,5 +1,9 @@
 # Performing table maintenance on unpartitioned Apache Iceberg tables using Apache Spark (with Scala and Python) 
 ## Preface
+Before everything here are some useful links on Apache Iceberg (apart from [the official docs](https://iceberg.apache.org/docs/latest/):
+- [What is Apache Iceberg?](https://www.dremio.com/resources/guides/apache-iceberg/)
+- [An architectural look under the covers](https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/#toc_item_The%20Iceberg%20Table%20Format)
+
 In this walkthrough we will use [open taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) 
 from New York.You can download the data using the following script, which downloads months 1-6 from 2022 at once:
 
@@ -25,7 +29,7 @@ too large in number. As data is added or deleted from an Apache Iceberg table, t
 impacting query performance as queries may need to open more files and scan more data than necessary. 
 Iceberg provides several built-in actions for dealing with maintenance.
 
-### Rewriting data files
+### Rewriting data files, aka file compaction
 #### Potential issue
 Data may arrive in smaller batches in Iceberg tables due to small writes or the ingestion of streaming data. 
 Ingesting smaller files is faster for writing but not as fast for querying. Querying the data would be more efficient 
@@ -127,6 +131,13 @@ You can also automatically clean metadata files by setting the following table p
 - `write.metadata.delete-after-commit.enabled` to `true`
 - `write.metadata.previous-versions-max` to the number of metadata files you want to keep (default 100)
 
+```scala
+taxis.writeTo("local.nyc.taxis")
+  .tableProperty("write.metadata.delete-after-commit.enabled", "true")
+  .tableProperty("write.metadata.previous-versions-max", "3")
+  .create
+```
+
 ### Deleting orphan files
 #### Potential problem
 Sometimes, Spark can create partially written files or files not associated with any snapshots. 
@@ -175,6 +186,25 @@ However, I don't have much experience with this, so I will mention it for comple
 SparkActions.get(spark)
   .rewriteManifests(table)
   .execute
+```
+
+The metadata of this snapshot contains the number of manifests rewritten:
+
+```json
+{
+  "operation" : "replace",
+  "manifests-created" : "1",
+  "manifests-kept" : "0",
+  "manifests-replaced" : "7",
+  "entries-processed" : "0",
+  "changed-partition-count" : "0",
+  "total-records" : "19817583",
+  "total-files-size" : "313217532",
+  "total-data-files" : "4",
+  "total-delete-files" : "0",
+  "total-position-deletes" : "0",
+  "total-equality-deletes" : "0"
+}
 ```
 
 ## Might be helpful
