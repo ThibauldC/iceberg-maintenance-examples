@@ -1,11 +1,11 @@
 # Performing table maintenance on unpartitioned Apache Iceberg tables using Apache Spark (with Scala and Python) 
 ## Preface
-Before everything here are some useful links on Apache Iceberg (apart from [the official docs](https://iceberg.apache.org/docs/latest/):
+Before starting the walkthrough here are some useful links on *Apache Iceberg* (apart from [the official docs](https://iceberg.apache.org/docs/latest/)):
 - [What is Apache Iceberg?](https://www.dremio.com/resources/guides/apache-iceberg/)
 - [An architectural look under the covers](https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/#toc_item_The%20Iceberg%20Table%20Format)
 
 In this walkthrough we will use [open taxi data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) 
-from New York.You can download the data using the following script, which downloads months 1-6 from 2022 at once:
+from New York. You can download the data using the following script, which downloads months 1-6 from 2022 at once:
 
 ```
 #!/bin/bash
@@ -42,7 +42,7 @@ Large files can also significantly decrease performance by limiting parallelism.
 
 #### Code
 To simulate the arrival of a number of small files into our Iceberg warehouse, we can set a table property called 
-`write.target-file-size-bytes` to 10Mb.Adding a few snapshots shows the presence of small files in the Iceberg data files:
+`write.target-file-size-bytes` to 10Mb. Adding a few snapshots shows the presence of small files in the Iceberg data files:
 
 ![Small files in the Iceberg data files](images/small_files.png)
 
@@ -85,11 +85,6 @@ Upon examining the summary of the latest snapshot, you'll see that 33 data files
 }
 ```
 
-Looking into the data files directory, you'll see the rewritten data files, with only 3 files of approximately 100MB 
-displayed, and one remaining file of 5MB:
-
-![Rewritten data files](images/last_modified.png)
-
 Achieving the same result in Python with a Spark procedure:
 ```python
 spark.sql(
@@ -102,6 +97,12 @@ spark.sql(
     """
 )
 ```
+
+Looking into the data files directory, you'll see the rewritten data files, with only 3 files of approximately 100MB 
+displayed, and one remaining file of 5MB:
+
+![Rewritten data files](images/last_modified.png)
+
 
 ### Expiring snapshots
 #### Potential problem
@@ -159,6 +160,8 @@ taxis.writeTo("local.nyc.taxis")
   .create
 ```
 
+The same table properties can be set when creating tables in Python.
+
 ### Deleting orphan files
 #### Potential problem
 Sometimes, Spark can create partially written files or files not associated with any snapshots. 
@@ -176,7 +179,7 @@ To demonstrate the procedure of deleting orphan files, we will create an orphan 
 TS=$(date -j -v-7d +"%Y-%m-%dT%H:%M:%S")
 touch -d $TS src/main/resources/warehouse/nyc/taxis/data/partial-file
 ```
-**!** This date command is for macOS and may be different on other systems.
+**!** This date command is for macOS and may be different on other systems. **!**
 
 You can observe that the file has been added:
 
