@@ -20,7 +20,7 @@ def expire_snapshots(spark: SparkSession, catalog: str, table: str) -> None:
         f"""
         CALL {catalog}.system.expire_snapshots(
             table => '{table}', 
-            older_than => TIMESTAMP '{datetime.now().strftime("%Y-%m-%d %H:%m:%S")}', 
+            older_than => TIMESTAMP '{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 
             retain_last => 1
         )
         """
@@ -28,7 +28,7 @@ def expire_snapshots(spark: SparkSession, catalog: str, table: str) -> None:
 
 
 def delete_orphan_files(spark: SparkSession, catalog: str, table: str) -> None:
-    ts = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%m:%S")
+    ts = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
 
     spark.sql(
         f"""

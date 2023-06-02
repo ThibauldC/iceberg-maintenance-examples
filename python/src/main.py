@@ -50,10 +50,9 @@ if __name__ == "__main__":
 
     spark.sparkContext.setLogLevel("INFO")
 
-    # read_taxi_files(spark)
+    read_taxi_files(spark)
 
-    # rewrite_data_files(spark, CATALOG, TABLE_NAME)
-    # expire_snapshots(spark, CATALOG, TABLE_NAME)
-    # delete_orphan_files(spark, CATALOG, TABLE_NAME)
-    # rewrite_manifests(spark, CATALOG, TABLE_NAME)
-
+    rewrite_data_files(spark, CATALOG, TABLE_NAME)
+    expire_snapshots(spark, CATALOG, TABLE_NAME)
+    delete_orphan_files(spark, CATALOG, TABLE_NAME)
+    rewrite_manifests(spark, CATALOG, TABLE_NAME)
