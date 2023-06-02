@@ -5,3 +5,6 @@ target/
 project/
 src/main/resources/data
 src/main/resources/warehouse
+python/.venv
+python/resources
+python/src/__pycache__/*

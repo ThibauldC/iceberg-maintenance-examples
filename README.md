@@ -92,7 +92,15 @@ displayed, and one remaining file of 5MB:
 
 Achieving the same result in Python with a Spark procedure:
 ```python
-print("to be filled in")
+spark.sql(
+    f"""
+    CALL local.system.rewrite_data_files(
+        table => 'nyc.taxis', 
+        strategy => 'binpack', 
+        options => map('target-file-size-bytes', {1024 * 1024 * 100})
+    )
+    """
+)
 ```
 
 ### Expiring snapshots
@@ -116,6 +124,19 @@ SparkActions.get(spark)
   .expireOlderThan(System.currentTimeMillis())
   .retainLast(1)
   .execute
+```
+
+Equivalent Python code:
+```python
+spark.sql(
+    f"""
+    CALL local.system.expire_snapshots(
+        table => 'nyc.taxis', 
+        older_than => TIMESTAMP '{datetime.now().strftime("%Y-%m-%d %H:%m:%S")}', 
+        retain_last => 1
+    )
+    """
+)
 ```
 
 This code expires snapshots older than the current time, retaining only the last snapshot. 
@@ -171,21 +192,48 @@ SparkActions.get(spark)
   .execute
 ```
 
+Equivalent Python code:
+```python
+ts = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%m:%S")
+
+spark.sql(
+    f"""
+    CALL local.system.remove_orphan_files(
+        table => 'nyc.taxis', 
+        older_than => TIMESTAMP '{ts}'
+    )
+    """
+)
+```
+
 Only the `partial-file` has been removed, and all other files remain untouched:
 
 ![Partial removed](images/partial_removed.png)
 
 Even if you run this with the `olderThan` setting all data files are maintained, and only the created orphan file
-has been removed.
+has been removed. Note that this action does not create a snapshot.
 
 ### Rewriting manifest files
 Rewriting manifest files is beneficial for better scan planning and achieving optimal sizes. 
 However, I don't have much experience with this, so I will mention it for completeness.
 
+Scala code:
+
 ```scala
 SparkActions.get(spark)
   .rewriteManifests(table)
   .execute
+```
+
+Python code:
+```python
+spark.sql(
+    f"""
+    CALL local.system.rewrite_manifests(
+        table => 'nyc.taxis'
+    )
+    """
+)
 ```
 
 The metadata of this snapshot contains the number of manifests rewritten:
@@ -209,6 +257,8 @@ The metadata of this snapshot contains the number of manifests rewritten:
 
 ## Might be helpful
 
+### Scala
+
 If you are running Spark 3.3.0 and up with Java 17, add the following JVM options:
 ```
 --add-opens=java.base/java.lang=ALL-UNNAMED \
@@ -226,3 +276,13 @@ If you are running Spark 3.3.0 and up with Java 17, add the following JVM option
 --add-opens=java.base/sun.util.calendar=ALL-UNNAMED \
 --add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED
 ```
+
+### Python
+It might be helpful to create a virtual environment when trying the Python code:
+
+```
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
