@@ -258,6 +258,25 @@ The metadata of this snapshot contains the number of manifests rewritten:
 }
 ```
 
+### Testing performance
+To test the performance improvement gained by the maintenance actions I created a larger table by append the same six months of taxi data 5 times (creating 30 snapshots).
+I then ran the following query on the resulting table *before* and *after* maintenance:
+
+```scala
+spark.table("local.nyc.taxis")
+  .withColumn("ride_month", month(col("tpep_pickup_datetime")))
+  .groupBy(col("VendorID"), col("ride_month"))
+  .agg(
+    sum("total_amount").as("sum_for_company"),
+    avg("total_amount").as("avg_for_company"),
+    min("total_amount").as("least_for_company"),
+    max("total_amount").as("most_for_company")
+  )
+  .show()
+```
+
+The query ran between 0.5 and 1 sec faster after performing the maintenance operations.
+
 ## Might be helpful
 
 ### Scala
